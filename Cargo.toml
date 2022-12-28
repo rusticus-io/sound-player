@@ -7,8 +7,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.68"
+dotenv = "0.15.0"
 env_logger = "0.10.0"
+glob = "0.3.0"
 log = "0.4.17"
 parking_lot = "0.12.1"
+rand = "0.8.5"
 tokio = { version = "1.23.0", features = ["rt", "macros", "rt-multi-thread", "time"] }
 watchman_client = "0.8.0"
