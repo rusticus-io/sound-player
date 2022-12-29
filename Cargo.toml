@@ -16,6 +16,3 @@ rand = "0.8.5"
 tokio = { version = "1.23.0", features = ["rt", "macros", "rt-multi-thread", "time"] }
 watchman_client = "0.8.0"
 
-[target.armv7-unknown-linux-gnueabihf]
-linker = "arm-none-linux-gnueabihf-gcc"
-
