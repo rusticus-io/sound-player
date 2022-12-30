@@ -2,14 +2,14 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
+use rand::Rng;
+use rppal::gpio::Gpio;
 use tokio::spawn;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio::time::sleep;
 use watchman_client::prelude::*;
 use watchman_client::SubscriptionData;
-use rand::Rng;
-
 
 #[derive(Default)]
 struct App {
@@ -29,6 +29,23 @@ impl Default for State {
     }
 }
 impl App {
+    pub async fn gpio(&self) -> anyhow::Result<()> {
+        let state = self.state.clone();
+        let gpio = Gpio::new()?;
+        let pin = gpio.get(4)?.into_input();
+        let jh = spawn(async move {
+            loop {
+                if pin.is_high() {
+                    state.write().await.do_play = true;
+                }
+
+                sleep(Duration::from_millis(200)).await;
+            }
+            #[allow(unreachable_code)]
+            Ok(())
+        });
+        jh.await?
+    }
     pub async fn watch(&self) -> anyhow::Result<()> {
         let state = self.state.clone();
         let client = Connector::new().connect().await?;
@@ -36,33 +53,22 @@ impl App {
             .resolve_root(CanonicalPath::canonicalize(sound_dir())?)
             .await?;
         let (mut subscription, _) = client
-            .subscribe(
-                &resolved,
-                SubscribeRequest::default()
-            )
+            .subscribe(&resolved, SubscribeRequest::default())
             .await?;
-        let jh = spawn(async move { loop {
-
+        let jh = spawn(async move {
+            loop {
                 let next: SubscriptionData<NameOnly> = subscription.next().await?;
 
-                match next {
-                    SubscriptionData::FilesChanged(_result) => {
-                        state.write().await.do_play = true;
-                        let mut v = vec![];
-                        for entry in glob::glob(&format!("{}/*", sound_dir())).unwrap() {
-                            match entry {
-                                Ok(path) => {
-                                    v.push(path.display().to_string());
-                                }
-                                _ => {}
-                            }
-                        }
-                        let num = rand::thread_rng().gen_range(0..v.len() + 10000);
-                        if let Some(entry) = v.get(num % v.len()).cloned() {
-                            state.write().await.parameter = vec![entry];
-                        }
+                if let SubscriptionData::FilesChanged(_result) = next {
+                    state.write().await.do_play = true;
+                    let mut v = vec![];
+                    for path in glob::glob(&format!("{}/*", sound_dir())).unwrap().flatten() {
+                        v.push(path.display().to_string());
                     }
-                    _ => {}
+                    let num = rand::thread_rng().gen_range(0..v.len() + 10000);
+                    if let Some(entry) = v.get(num % v.len()).cloned() {
+                        state.write().await.parameter = vec![entry];
+                    }
                 }
             }
             #[allow(unreachable_code)]
@@ -70,9 +76,10 @@ impl App {
         });
         jh.await?
     }
-    pub async fn run(&self) -> anyhow::Result<()>{
+    pub async fn run(&self) -> anyhow::Result<()> {
         let state = self.state.clone();
-        let jh = spawn(async move { loop {
+        let jh = spawn(async move {
+            loop {
                 let play = state.read().await.do_play;
                 if play {
                     let mut command = command(&state.read().await.parameter[..]);
@@ -82,8 +89,7 @@ impl App {
                             Ok(_) => {}
                             Err(e) => log::info!("wait error: {:?}", e),
                         }
-                    }
-                    else {
+                    } else {
                         log::info!("error spawning process");
                     }
                     state.write().await.do_play = false;
@@ -104,9 +110,20 @@ async fn main() -> anyhow::Result<()> {
     let app = Arc::new(App::default());
     let mut set = JoinSet::new();
     let _app = app.clone();
-    set.spawn(async move { _app.run().await?; anyhow::Ok(()) });
+    set.spawn(async move {
+        _app.gpio().await?;
+        anyhow::Ok(())
+    });
     let _app = app.clone();
-    set.spawn(async move { _app.watch().await?; anyhow::Ok(()) });
+    set.spawn(async move {
+        _app.run().await?;
+        anyhow::Ok(())
+    });
+    let _app = app.clone();
+    set.spawn(async move {
+        _app.watch().await?;
+        anyhow::Ok(())
+    });
     while let Some(Ok(_)) = set.join_next().await {}
     Ok(())
 }
@@ -116,7 +133,7 @@ pub fn command(subsitutes: &[String]) -> Command {
     command.arg("nothing to do.");
     let mut sub = 0;
     if let Ok(value) = dotenv::var("cmd") {
-        for (i, part) in value.split(" ").enumerate() {
+        for (i, part) in value.split(' ').enumerate() {
             let mut part = part.trim();
             log::info!("{part}");
             if part.eq("") {
@@ -130,7 +147,9 @@ pub fn command(subsitutes: &[String]) -> Command {
             }
             match i {
                 0 => command = Command::new(part),
-                _ => { command.arg(part); },
+                _ => {
+                    command.arg(part);
+                }
             }
         }
     }
@@ -138,8 +157,8 @@ pub fn command(subsitutes: &[String]) -> Command {
 }
 
 pub fn sound_dir() -> String {
-    dotenv::var("sound_dir").unwrap_or("./sounds".to_string())
+    dotenv::var("sound_dir").unwrap_or_else(|_| "./sounds".to_string())
 }
 pub fn default_sound() -> String {
-    dotenv::var("default_sound").unwrap_or("".to_string())
+    dotenv::var("default_sound").unwrap_or_else(|_| "".to_string())
 }
