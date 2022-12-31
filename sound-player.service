@@ -1,0 +1,10 @@
+[Unit]
+Description=Sound Player for Vending Machine
+
+[Service]
+ExecStart=/home/pi/VendingMachine/sound-player
+WorkingDirectory=/home/pi/VendingMachine
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
