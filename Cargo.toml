@@ -12,7 +12,7 @@ env_logger = "0.10.0"
 glob = "0.3.0"
 log = "0.4.17"
 parking_lot = "0.12.1"
-rand = "0.8.5"
+random-number = "0.1.8"
 rppal = "0.14.1"
 tokio = { version = "1.23.0", features = ["rt", "macros", "rt-multi-thread", "time"] }
 watchman_client = "0.8.0"

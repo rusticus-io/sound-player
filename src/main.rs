@@ -2,7 +2,6 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
-use rand::Rng;
 use rppal::gpio::Gpio;
 use tokio::spawn;
 use tokio::sync::RwLock;
@@ -29,14 +28,16 @@ impl Default for State {
     }
 }
 impl App {
-    pub async fn gpio(&self) -> anyhow::Result<()> {
-        let state = self.state.clone();
+    pub async fn switch(&self) -> anyhow::Result<()> {
+        let mut state = self.state.clone();
         let gpio = Gpio::new()?;
         let pin = gpio.get(4)?.into_input();
         let jh = spawn(async move {
             loop {
-                if pin.is_high() {
+                let play = state.read().await.do_play;
+                if !play && pin.is_high() {
                     state.write().await.do_play = true;
+                    set_sound(&mut state).await;
                 }
 
                 sleep(Duration::from_millis(200)).await;
@@ -46,8 +47,27 @@ impl App {
         });
         jh.await?
     }
-    pub async fn watch(&self) -> anyhow::Result<()> {
+    pub async fn monitor(&self) -> anyhow::Result<()> {
         let state = self.state.clone();
+        let gpio = Gpio::new()?;
+        let mut pin = gpio.get(14)?.into_output();
+        let jh = spawn(async move {
+            loop {
+                if state.read().await.do_play {
+                    pin.set_high();
+                }
+                else {
+                    pin.set_low();
+                }
+                sleep(Duration::from_millis(200)).await;
+            }
+            #[allow(unreachable_code)]
+            Ok(())
+        });
+        jh.await?
+    }
+    pub async fn watch(&self) -> anyhow::Result<()> {
+        let mut state = self.state.clone();
         let client = Connector::new().connect().await?;
         let resolved = client
             .resolve_root(CanonicalPath::canonicalize(sound_dir())?)
@@ -61,14 +81,7 @@ impl App {
 
                 if let SubscriptionData::FilesChanged(_result) = next {
                     state.write().await.do_play = true;
-                    let mut v = vec![];
-                    for path in glob::glob(&format!("{}/*", sound_dir())).unwrap().flatten() {
-                        v.push(path.display().to_string());
-                    }
-                    let num = rand::thread_rng().gen_range(0..v.len() + 10000);
-                    if let Some(entry) = v.get(num % v.len()).cloned() {
-                        state.write().await.parameter = vec![entry];
-                    }
+                    set_sound(&mut state).await;
                 }
             }
             #[allow(unreachable_code)]
@@ -81,6 +94,7 @@ impl App {
         let jh = spawn(async move {
             loop {
                 let play = state.read().await.do_play;
+                log::info!("do_play is : {play}");
                 if play {
                     let mut command = command(&state.read().await.parameter[..]);
                     log::info!("{:?}", command);
@@ -92,8 +106,8 @@ impl App {
                     } else {
                         log::info!("error spawning process");
                     }
-                    state.write().await.do_play = false;
                 }
+                state.write().await.do_play = false;
                 sleep(Duration::from_secs(1)).await;
             }
             #[allow(unreachable_code)]
@@ -111,7 +125,12 @@ async fn main() -> anyhow::Result<()> {
     let mut set = JoinSet::new();
     let _app = app.clone();
     set.spawn(async move {
-        _app.gpio().await?;
+        _app.monitor().await?;
+        anyhow::Ok(())
+    });
+    let _app = app.clone();
+    set.spawn(async move {
+        _app.switch().await?;
         anyhow::Ok(())
     });
     let _app = app.clone();
@@ -161,4 +180,15 @@ pub fn sound_dir() -> String {
 }
 pub fn default_sound() -> String {
     dotenv::var("default_sound").unwrap_or_else(|_| "".to_string())
+}
+pub async fn set_sound(state: &mut Arc<RwLock<State>>) {
+    let mut v = vec![];
+    for path in glob::glob(&format!("{}/*", sound_dir())).unwrap().flatten() {
+        v.push(path.display().to_string());
+    }
+    let num = random_number::random!(0..v.len());//rng.gen_range(0..v.len() + 10000);
+    log::info!("random {}", num);
+    if let Some(entry) = v.get(num % v.len()).cloned() {
+        state.write().await.parameter = vec![entry];
+    }
 }
