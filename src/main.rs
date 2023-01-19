@@ -55,8 +55,7 @@ impl App {
             loop {
                 if state.read().await.do_play {
                     pin.set_high();
-                }
-                else {
+                } else {
                     pin.set_low();
                 }
                 sleep(Duration::from_millis(200)).await;
@@ -186,7 +185,7 @@ pub async fn set_sound(state: &mut Arc<RwLock<State>>) {
     for path in glob::glob(&format!("{}/*", sound_dir())).unwrap().flatten() {
         v.push(path.display().to_string());
     }
-    let num = random_number::random!(0..v.len());//rng.gen_range(0..v.len() + 10000);
+    let num = random_number::random!(0..v.len());
     log::info!("random {}", num);
     if let Some(entry) = v.get(num % v.len()).cloned() {
         state.write().await.parameter = vec![entry];
