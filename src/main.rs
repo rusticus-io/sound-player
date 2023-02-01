@@ -146,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn command(subsitutes: &[String]) -> Command {
+pub fn command(substitutes: &[String]) -> Command {
     let mut command = Command::new("echo");
     command.arg("nothing to do.");
     let mut sub = 0;
@@ -159,7 +159,7 @@ pub fn command(subsitutes: &[String]) -> Command {
             }
             let s;
             if part.eq("{}") {
-                s = part.replace("{}", subsitutes.get(sub).unwrap_or(&"{}".to_string()));
+                s = part.replace("{}", substitutes.get(sub).unwrap_or(&"{}".to_string()));
                 part = &s;
                 sub += 1;
             }

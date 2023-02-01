@@ -1,4 +1,5 @@
 #!/bin/env bash
+# cross builds and automatically deploys to the pi
 set -e
 cross build --release --target aarch64-unknown-linux-musl
 ssh pi@raspberrypi.local mkdir -p /home/pi/VendingMachine
