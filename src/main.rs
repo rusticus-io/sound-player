@@ -40,7 +40,7 @@ impl App {
                     set_sound(&mut state).await;
                 }
 
-                sleep(Duration::from_millis(200)).await;
+                sleep(Duration::from_millis(50)).await;
             }
             #[allow(unreachable_code)]
             Ok(())
