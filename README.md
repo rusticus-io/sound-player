@@ -69,8 +69,10 @@ When you open another shell on your pi, you can touch, add, or remove files form
 
 #### Finishing your project
 
-Copy the `sound-player.service` file into the folder `/lib/system.d/system` on your pi and activate the service with
-`sudo systemctl start sound-player.service`.
+Copy the `asound.conf` to `/etc`.
+
+Copy the `sound-player.service` file into the folder `/etc/system.d/system` on your pi and activate the service with
+`sudo systemctl enable sound-player.service`.
 
 Buy an USB Sound Adapter at your favorite electronics store and attach it to the pi with a speaker.
 

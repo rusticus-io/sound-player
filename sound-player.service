@@ -1,5 +1,7 @@
 [Unit]
 Description=Sound Player for Vending Machine
+After=sound.target
+Requires=sound.target
 
 [Service]
 ExecStart=/home/pi/VendingMachine/sound-player
@@ -8,3 +10,7 @@ StandardOutput=inherit
 StandardError=inherit
 Restart=always
 User=pi
+Type=simple
+
+[Install]
+WantedBy=sound.target

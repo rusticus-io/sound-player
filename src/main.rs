@@ -31,10 +31,11 @@ impl App {
     pub async fn switch(&self) -> anyhow::Result<()> {
         let mut state = self.state.clone();
         let gpio = Gpio::new()?;
-        let pin = gpio.get(4)?.into_input();
+        let pin = gpio.get(27)?.into_input();
         let jh = spawn(async move {
             loop {
                 let play = state.read().await.do_play;
+                //log::info!("switch play {:?}", state.read().await.do_play);
                 if !play && pin.is_high() {
                     state.write().await.do_play = true;
                     set_sound(&mut state).await;
@@ -53,6 +54,7 @@ impl App {
         let mut pin = gpio.get(14)?.into_output();
         let jh = spawn(async move {
             loop {
+                //log::info!("monitor play {:?}", state.read().await.do_play);
                 if state.read().await.do_play {
                     pin.set_high();
                 } else {
